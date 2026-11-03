@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Konversi Gambar Administrasi (Gemini AI Engine)</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f6fa;color:#1d2939;font:15px Arial,sans-serif}
+header{background:linear-gradient(120deg,#17365d,#2673a6);color:white;padding:22px}
+header>div,main{max-width:1150px;margin:auto}
+h1{margin:0 0 8px;font-size:clamp(22px,4vw,30px)}
+header p{margin:0;line-height:1.5}
+.card{background:white;border:1px solid #d4dde7;border-radius:13px;padding:17px;margin:16px 0;box-shadow:0 4px 14px #152b4510}
+h2{color:#17365d;font-size:19px;margin:0 0 12px}
+.muted{color:#667085;font-size:13px;line-height:1.5}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{border:0;border-radius:8px;padding:11px 14px;font-weight:bold;cursor:pointer}
+.blue{background:#245b91;color:#fff}
+.green{background:#188653;color:#fff}
+.light{background:#e8eef5;color:#17365d}
+.red{background:#fde8e7;color:#b42318}
+input[type=file]{max-width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px}
+textarea,input[type=text],input[type=password]{font:inherit;border:1px solid #cbd5e1;border-radius:7px;padding:9px;width:100%}
+textarea{margin-top:8px}
+.preview{display:none;max-width:100%;max-height:350px;object-fit:contain;margin-top:12px;border:1px solid #ddd}
+.status{white-space:pre-wrap;margin-top:10px;font-size:14px;font-weight:bold}
+.status.ok{color:#188653}
+.status.error{color:#b42318}
+.tablewrap{overflow:auto;border:1px solid #d4dde7;border-radius:8px;margin-top:10px}
+table{border-collapse:collapse;width:100%;min-width:750px}
+th,td{border-bottom:1px solid #dce3eb;padding:7px;vertical-align:top}
+th{background:#e8eff7;text-align:left;color:#17365d;font-size:12px}
+td:first-child input{min-width:190px}
+td input{min-width:120px}
+.tag{font-size:12px;background:#eaf6ef;color:#17683f;border-radius:15px;padding:4px 8px}
+footer{text-align:center;color:#667085;font-size:12px;padding:8px 15px 25px}
+@media(max-width:600px){.card{padding:12px}.btn{padding:10px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Konversi Gambar Administrasi ke Excel (Gemini AI)</h1>
+    <p>Ekstraksi tabel gambar otomatis berbasis AI → Edit → Unduh Excel (.xls) Teks Murni.</p>
+  </div>
+</header>
+<main>
+  <section class="card">
+    <h2>1. Pengaturan Gemini API Key</h2>
+    <p class="muted">API Key sudah terpasang otomatis di bawah ini.</p>
+    <div class="row">
+      <input id="apiKey" type="password" placeholder="Gemini API Key..." style="flex:1">
+      <button id="saveKeyBtn" class="btn light">Simpan Key</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. Upload Gambar Tabel</h2>
+    <div class="row">
+      <input id="file" type="file" accept="image/png,image/jpeg,image/webp">
+      <button id="ocrBtn" class="btn blue" disabled>Proses Gambar dengan AI</button>
+      <button id="clearBtn" class="btn light">Bersihkan</button>
+    </div>
+    <img id="preview" class="preview" alt="Pratinjau">
+    <div id="status" class="status muted">Pilih gambar JPG/PNG dan klik Proses Gambar dengan AI.</div>
+  </section>
+
+  <section class="card">
+    <h2>3. Periksa Data & Ekspor <span class="tag">5 Kolom</span></h2>
+    <p class="muted">Semua sel diekspor sebagai teks murni agar nominal angka tidak berantakan saat dibuka di Excel / WA Massal.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nama</th>
+            <th>SPP</th>
+            <th>BP3</th>
+            <th>KITAB + Daftar Ulang</th>
+            <th>Total Tanggungan</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:13px">
+      <button id="addBtn" class="btn light">+ Tambah Baris</button>
+      <button id="exportBtn" class="btn green">Download Excel (.xls)</button>
+      <button id="csvBtn" class="btn light">Download CSV UTF-8</button>
+    </div>
+  </section>
+</main>
+<footer>Web Client-Side powered by Gemini Vision API.</footer>
+
+<script>
+const $=id=>document.getElementById(id),
+file=$('file'), preview=$('preview'), ocrBtn=$('ocrBtn'), status=$('status'), 
+apiKeyInput=$('apiKey'), saveKeyBtn=$('saveKeyBtn'), tbody=$('tbody');
+
+let base64Image = '', imageMime = '';
+
+// Masukkan API key bawaan secara otomatis
+const defaultKey = 'AQ.Ab8RN6K2bA-A4rVLoQYjepOTAkButdBNY7QtRgdPgH1QWyG8eg';
+if (!localStorage.getItem('gemini_api_key')) {
+    apiKeyInput.value = defaultKey;
+    localStorage.setItem('gemini_api_key', defaultKey);
+} else {
+    apiKeyInput.value = localStorage.getItem('gemini_api_key');
+}
+
+saveKeyBtn.onclick = () => {
+    localStorage.setItem('gemini_api_key', apiKeyInput.value.trim());
+    msg('API Key berhasil diperbarui!', 'ok');
+};
+
+function msg(s, kind='muted'){ status.className='status '+kind; status.textContent=s; }
+
+function addRow(vals=['','','','','']){
+    let tr=document.createElement('tr');
+    vals.forEach((v,i)=>{
+        let td=document.createElement('td'), inp=document.createElement('input');
+        inp.type='text'; inp.value=v||'';
+        inp.setAttribute('aria-label',['Nama','SPP','BP3','KITAB','Total Tanggungan'][i]);
+        td.append(inp); tr.append(td);
+    });
+    let td=document.createElement('td'), b=document.createElement('button');
+    b.className='btn red'; b.textContent='Hapus';
+    b.onclick=()=>tr.remove();
+    td.append(b); tr.append(td); tbody.append(tr);
+}
+
+function rows(){
+    return [...tbody.querySelectorAll('tr')]
+        .map(tr=>[...tr.querySelectorAll('input')].map(x=>x.value.trim()))
+        .filter(r=>r.some(Boolean));
+}
+
+file.onchange = () => {
+    let f = file.files[0];
+    if (!f) return;
+    imageMime = f.type;
+    let reader = new FileReader();
+    reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        base64Image = e.target.result.split(',')[1];
+        ocrBtn.disabled = false;
+        msg('Gambar siap diproses oleh Gemini AI.');
+    };
+    reader.readAsDataURL(f);
+};
+
+ocrBtn.onclick = async () => {
+    let apiKey = apiKeyInput.value.trim() || localStorage.getItem('gemini_api_key');
+    if (!apiKey) {
+        msg('API Key kosong!', 'error');
+        return;
+    }
+    if (!base64Image) {
+        msg('Pilih gambar tabel terlebih dahulu!', 'error');
+        return;
+    }
+
+    ocrBtn.disabled = true;
+    msg('AI sedang membaca dan menyusun tabel... Mohon tunggu beberapa detik.');
+
+    let promptText = `Analisis foto tabel administrasi pembayaran ini. Ekstrak seluruh data siswa ke dalam format JSON array of array (tanpa markdown tambahan, murni JSON).
+Tiap elemen array berisi 5 string teks murni:
+1. Nama Siswa (kapital rapi)
+2. SPP (misal "Rp 945.000" atau "Rp 945.000 (Ket. 3 bulan)")
+3. BP3 (misal "Rp 520.000" atau "-")
+4. KITAB / Daftar Ulang (misal "Rp 125.000" atau "-")
+5. Total Tanggungan (misal "Rp 2.220.000")
+
+Abaikan baris total/jumlah/tanda tangan. Hanya keluarkan format JSON valid seperti contoh ini:
+[["JULIYA SAPITRIYANA", "Rp 945.000", "Rp 1.150.000", "Rp 125.000", "Rp 2.220.000"]]`;
+
+    try {
+        let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [
+                        { text: promptText },
+                        { inline_data: { mime_type: imageMime, data: base64Image } }
+                    ]
+                }]
+            })
+        });
+
+        let data = await response.json();
+        if (data.error) throw new Error(data.error.message);
+
+        let textResponse = data.candidates[0].content.parts[0].text;
+        let cleanJson = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+        let parsedRows = JSON.parse(cleanJson);
+
+        if (Array.isArray(parsedRows) && parsedRows.length > 0) {
+            tbody.innerHTML = '';
+            parsedRows.forEach(r => addRow(r));
+            msg(`Berhasil membaca ${parsedRows.length} baris data dengan Gemini AI!`, 'ok');
+        } else {
+            msg('AI selesai membaca tetapi tidak menemukan data tabel yang sesuai.', 'error');
+        }
+    } catch (e) {
+        msg('Gagal memproses AI: ' + e.message, 'error');
+    } finally {
+        ocrBtn.disabled = false;
+    }
+};
+
+$('addBtn').onclick = () => addRow();
+$('clearBtn').onclick = () => {
+    file.value = ''; preview.style.display = 'none'; preview.removeAttribute('src');
+    base64Image = ''; tbody.innerHTML = ''; ocrBtn.disabled = true; addRow();
+    msg('Form dibersihkan.');
+};
+
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+function excel(rows){
+    let h='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><style>td,th{mso-number-format:"\\@";border:1px solid #999;padding:5px}th{background:#d9eaf7;font-weight:bold}</style></head><body><table><thead><tr>'+['Nama','SPP','BP3','KITAB','Total Tanggungan'].map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>';
+    for(let r of rows) {
+        h+='<tr>'+r.map(v=>'<td style="mso-number-format:\\@\\">'+esc(v)+'</td>').join('')+'</tr>';
+    }
+    return h+'</tbody></table></body></html>';
+}
+
+$('exportBtn').onclick = () => {
+    let r = rows();
+    if (!r.length) { msg('Belum ada data untuk diekspor.', 'error'); return; }
+    let blob = new Blob(['\ufeff', excel(r)], {type: 'application/vnd.ms-excel;charset=utf-8'});
+    let a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Rekap_Administrasi_WA.xls';
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    msg('File Excel (.xls) berhasil diunduh.', 'ok');
+};
+
+$('csvBtn').onclick = () => {
+    let r = rows();
+    if (!r.length) { msg('Belum ada data untuk diekspor.', 'error'); return; }
+    let all = [['Nama', 'SPP', 'BP3', 'KITAB', 'Total Tanggungan'], ...r];
+    let csv = '\ufeff' + all.map(row => row.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\r\n');
+    let a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
+    a.download = 'Rekap_Administrasi_WA.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+addRow();
+</script>
+</body>
+</html>
